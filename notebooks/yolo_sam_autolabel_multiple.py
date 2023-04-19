@@ -208,9 +208,3 @@ import json
 json_annotation = json.dumps(coco_dict)
 with open('annotations.json', 'w') as f:
   f.write(json_annotation)
-
-!cat annotations.json
-
-# Download the file.
-from google.colab import files
-files.download('annotations.json')

@@ -19,47 +19,13 @@ from pathlib import Path
 # Model
 model = torch.hub.load("ultralytics/yolov5", "yolov5x")  # or yolov5n - yolov5x6, custom
 
-#wget -q https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
-
-# Commented out IPython magic to ensure Python compatibility.
-# Images
-#img = "data/images/zidane.jpg" # or file, Path, PIL, OpenCV, numpy, list
-imgPath0 = "images/prueba2.jpg"
-
-img = cv2.imread(imgPath0)
-# %cd segment-anything/notebooks
-
-results = model(img)
-
-# Commented out IPython magic to ensure Python compatibility.
-# %matplotlib inline
-# Results
-showimg = img.copy()
-for *xyxy, conf, cls in results.pandas().xyxy[0].itertuples(index=False):
-    print(f"Predicted {cls} at {[round(elem, 2) for elem in xyxy ]} with confidence {conf:.2f}.")
-    showimg = cv2.rectangle(showimg, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
-    showimg = cv2.putText(showimg, f"{cls} {conf:.2f}", (int(xyxy[0]), int(xyxy[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-# Visualize on matplotlib
-plt.imshow(cv2.cvtColor(showimg, cv2.COLOR_BGR2RGB))
-plt.axis('off') 
-plt.show()
-cv2.imwrite("processedimages/prueba2_yolo.jpg", showimg)
-
-def show_mask(mask, ax, random_color=False):
-    if random_color:
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-    else:
-        color = np.array([30/255, 144/255, 255/255, 0.6])
-    h, w = mask.shape[-2:]
-    mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-    ax.imshow(mask_image)
 
 import sys
 sys.path.append("..")
 from segment_anything import sam_model_registry, SamPredictor
 sam_model = "h"
 
+#wget -q https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
 if sam_model =="h":
   sam_checkpoint = "sam_vit_h_4b8939.pth"
   model_type = "vit_h"
@@ -74,59 +40,9 @@ sam.to(device=device)
 
 predictor = SamPredictor(sam)
 
-scale_percent = 100 # percent of original size
-width = int(img.shape[1] * scale_percent / 100)
-height = int(img.shape[0] * scale_percent / 100)
-dim = (width, height)
-  
-# resize image
-resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-
-predictor.set_image(resized)
-
-image_bboxes = []
-image_xywh = []
-
-for *xyxy, conf, cls in results.pandas().xyxy[0].itertuples(index=False):
-  if cls in ['cup', 'bottle', 'vase'] or True:
-    print(f"Predicted {cls} at {[round(elem, 2) for elem in xyxy ]} with confidence {conf:.2f}.")
-    image_bboxes.append(np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3]]))
-    image_xywh.append([xyxy[0], xyxy[1], xyxy[2]-xyxy[0], xyxy[3]-xyxy[1]])
-
-masks = []
-
-for image_bbox in image_bboxes:
-  mask, _, _ = predictor.predict(
-      point_coords=None,
-      point_labels=None,
-      box=image_bbox,
-      multimask_output=False,
-  )
-  masks.append(mask)
-
-plt.figure(figsize=(10, 10))
-showimg = resized.copy()
-
-for i, mask in enumerate(masks):
-  print(f"drawing mask{i}")
-  print(type(mask[0]))
-  contours, _ = cv2.findContours(mask[0].astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-  cv2.drawContours(showimg, contours, -1, (255,0,255), 3)
-
-plt.imshow(cv2.cvtColor(showimg, cv2.COLOR_BGR2RGB))
-print(masks[0].shape[-2:])
-plt.axis('off')
-plt.show()
-cv2.imwrite("processedimages/prueba2_sam.jpg", showimg)
-
-# Creating annotation in COCO format
-#{"id": 0, "file_name": "0.jpg", "height": 480, "width": 736}
 images=[]
 annotations=[]
 categories=[]
-
-category_id = 0
-category_name = "laptop"
 
 image_0 ={"id": 0, "file_name": "0.jpg", "height": 480, "width": 736}
 
@@ -150,6 +66,7 @@ for imgPath in imgPaths:
   for *xyxy, conf, cls in results.pandas().xyxy[0].itertuples(index=False):
     #run for each detection
     if cls in ['cup', 'bottle', 'vase']:
+      category_id = 0 if cls=='cup' else 1
       print(f"Predicted {cls} at {[round(elem, 2) for elem in xyxy ]} with on img {imgPath}.")
       image_bbox = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3]]))
       xywh = [xyxy[0], xyxy[1], xyxy[2]-xyxy[0], xyxy[3]-xyxy[1]]
@@ -191,8 +108,10 @@ for imgPath in imgPaths:
   plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
   plt.show()
 
+categoryDict = {0 : "CUP", 1: "BOTTLE"}
 categories = []
-categories.append({"id": 0,"name": "red bottles"})
+categories.append({"id": 0,"name": categoryDict[0]})
+categories.append({"id": 1,"name": categoryDict[1]})
 print(annotations)
 
 # Define the COCO dictionary
@@ -208,9 +127,3 @@ import json
 json_annotation = json.dumps(coco_dict)
 with open('annotations.json', 'w') as f:
   f.write(json_annotation)
-
-!cat annotations.json
-
-# Download the file.
-from google.colab import files
-files.download('annotations.json')

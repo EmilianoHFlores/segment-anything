@@ -44,6 +44,8 @@ for *xyxy, conf, cls in results.pandas().xyxy[0].itertuples(index=False):
 plt.imshow(cv2.cvtColor(showimg, cv2.COLOR_BGR2RGB))
 plt.axis('off') 
 plt.show()
+#save image
+cv2.imwrite("images/prueba2_out.jpg", showimg)
 '''
 def show_mask(mask, ax, random_color=False):
     if random_color:
